@@ -73,3 +73,6 @@ Only challenges and files visible to the authenticated account are downloaded.
 ## TODO:
 - Add Async Loading for challenges and files
 - Replace the "Saved:" and "Scored:" Messages with a progress bar (maybe only on -p)
+- Normalize session and make easier to call
+- Add checkpointing (load to make the checkpoint of whats loaded and pull to pull)
+    - Pull and score should save the base_url, session? maybe?
