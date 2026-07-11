@@ -8,6 +8,10 @@ A small Python utility for downloading challenge metadata and files from a CTFd 
 python3 -m pip install -r requirements.txt
 ```
 
+```bash
+sudo cp ctfd.py /usr/local/bin/ctfd
+```
+
 ## Usage
 
 Download all visible challenges:

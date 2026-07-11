@@ -129,10 +129,11 @@ def save_challenge(challenge, location, site_url, auth):
 
     category = sanitize_filename(
         challenge.get("category", "UNKNOWN")
-    )
+    ).replace(" ", "_")
+
     challenge_name = sanitize_filename(
         challenge.get("name", "UNKNOWN")
-    )
+    ).replace(" ", "_")
 
     parent = Path(location) / category
     challenge_dir = parent / challenge_name
@@ -157,42 +158,6 @@ def save_challenge(challenge, location, site_url, auth):
         encoding="utf-8",
     ) as f:
         json.dump(meta, f, indent=2)
-
-def pull_event(site_url, location, auth):
-    base_url = urljoin(site_url, "api/v1/")
-
-    challenges = get_challenges(base_url, auth)
-    failed = []
-    for challenge in challenges:
-        try:
-            full_challenge = get_challenge(
-                challenge,
-                base_url,
-                auth,
-            )
-
-            save_challenge(
-                full_challenge,
-                location,
-                site_url,
-                auth,
-            )
-
-            print(
-                f"Saved: {full_challenge.get('name', 'UNKNOWN')}"
-            )
-
-        except Exception as e:
-            failed.append(
-                {
-                    "id": challenge.get("id"),
-                    "name": challenge.get("name"),
-                    "err": str(e),
-                }
-            )
-
-    if failed:
-        print(f"Failed:\n{json.dumps(failed, indent=2)}")
 
 def format_score_output(challenges):
     grouped = {
@@ -241,6 +206,42 @@ def format_score_output(challenges):
 
         print()
 
+def pull_event(site_url, location, auth):
+    base_url = urljoin(site_url, "api/v1/")
+
+    challenges = get_challenges(base_url, auth)
+    failed = []
+    for challenge in challenges:
+        try:
+            full_challenge = get_challenge(
+                challenge,
+                base_url,
+                auth,
+            )
+
+            save_challenge(
+                full_challenge,
+                location,
+                site_url,
+                auth,
+            )
+
+            print(
+                f"Saved: {full_challenge.get('name', 'UNKNOWN')}"
+            )
+
+        except Exception as e:
+            failed.append(
+                {
+                    "id": challenge.get("id"),
+                    "name": challenge.get("name"),
+                    "err": str(e),
+                }
+            )
+
+    if failed:
+        print(f"Failed:\n{json.dumps(failed, indent=2)}")
+
 def score_event(site_url, location, auth):
     global SCORE_KEYS
     base_url = urljoin(site_url, "api/v1/")
@@ -282,7 +283,7 @@ def score_event(site_url, location, auth):
     with open(Path(location) / SCORE_FILE_NAME, "w") as f:
         json.dump(results, f, indent=2)
     
-    print(format_score_output(results))
+    format_score_output(results)
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
