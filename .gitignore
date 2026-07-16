@@ -52,3 +52,53 @@ RESULTS.json
 # Logs
 
 *.log
+
+# Go build outputs
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Coverage and profiling
+coverage.out
+coverage.html
+*.prof
+*.pprof
+
+# Go workspace
+go.work
+go.work.sum
+
+# Vendored dependencies
+vendor/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+*.log
+tmp/
+temp/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Project-specific generated files
+ctfd
+SCORE.json
+RESULTS.json
