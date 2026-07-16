@@ -91,16 +91,6 @@ go vet ./...
 All Headers get saved to plain text. Because of this, ensure that you do not publicize the root META.json file
 
 ## TODO:
-* Make the lookup for already saved faster by using a dict or something
-* `fails = append(fails, chal)` is a concurrent slice write and causes a data race.
-* `SuccessfullyDownloadedChallenges = append(...)` is a concurrent slice write and causes a data race.
-* `scores.Scores` and `scores.FinalResult` are modified concurrently and cause data races.
-* Already-downloaded challenges are skipped without incrementing the progress bar, so `pull` may never reach 100%.
-* `PullEvent` panics on the first worker error, so the collected failure list never prints.
-* `ScoreEvent` panics inside a goroutine instead of returning the error through `errgroup`.
 * `Get` does not reject non-2xx HTTP responses, so login/error pages may later appear as JSON parsing errors.
 * Any metadata read error is treated as missing metadata, including malformed JSON and permission errors.
-* The invalid-command error says only `score or pull` even though `store` is valid.
 * `DownloadFiles` panics on a malformed file URL instead of returning an error.
-* Wrapped errors use `%v` in several places; use `%w` so callers can inspect the underlying error.
-* The loop variables should be copied before goroutines for compatibility and clarity: `chal := chal` and `i := i`.
