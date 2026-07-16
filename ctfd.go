@@ -37,6 +37,9 @@ type CLIOptions struct {
 	Cookie    string
 	CookieSet bool
 
+	AuthToken string
+	AuthTokenSet bool
+
 	GroupLimit    int
 	GroupLimitSet bool
 }
@@ -667,7 +670,7 @@ func ReadEventMetadata(location string) (*CTFdEvent, error) {
 func ParseCLI() (*CLIOptions, error) {
 	if len(os.Args) < 3 {
 		return nil, fmt.Errorf(
-			"usage: %s <score|pull|store> <location> [--base URL] [--cookie COOKIE] [--group_limit N]",
+			"usage: %s <score|pull|store> <location> [--base URL] [--cookie COOKIE] [--auth TOKEN] [--group_limit N]",
 			os.Args[0],
 		)
 	}
@@ -696,6 +699,12 @@ func ParseCLI() (*CLIOptions, error) {
 		"cookie",
 		"",
 		"CTFd session cookie",
+	)
+
+	authToken := flags.String(
+		"auth",
+		"",
+		"CTFd API access token",
 	)
 
 	groupLimit := flags.Int(
@@ -748,8 +757,10 @@ func ParseCLI() (*CLIOptions, error) {
 		Cookie:    *cookie,
 		CookieSet: present["cookie"],
 
-		GroupLimit:    *groupLimit,
-		GroupLimitSet: present["group_limit"],
+		AuthToken:    *authToken,
+		AuthTokenSet: present["auth"],
+
+		GroupLimit: *groupLimit,
 	}, nil
 }
 
@@ -786,6 +797,14 @@ func main() {
 		}
 
 		event.Headers["Cookie"] = options.Cookie
+	}
+
+	if options.AuthTokenSet {
+		if event.Headers == nil {
+			event.Headers = make(map[string]string)
+		}
+
+		event.Headers["Authorization"] = "Token " + options.AuthToken
 	}
 
 	event.GroupLimit = options.GroupLimit

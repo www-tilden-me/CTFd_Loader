@@ -38,6 +38,7 @@ Options:
 ```text
 --base <url>          CTFd base URL
 --cookie <cookie>     CTFd session cookie
+--auth <token>        CTFd Auth Token
 --group_limit <n>     Maximum concurrent requests
 ```
 
@@ -47,6 +48,7 @@ Example:
 ctfd pull ./challenges \
     --base "https://example.ctfd.io" \
     --cookie "session=your-cookie" \
+    --auth "your_api_token" \
     --group_limit 5
 ```
 
@@ -84,6 +86,9 @@ Format and check:
 gofmt -w .
 go vet ./...
 ```
+
+## Warning
+All Headers get saved to plain text. Because of this, ensure that you do not publicize the root META.json file
 
 ## TODO:
 * Make the lookup for already saved faster by using a dict or something
