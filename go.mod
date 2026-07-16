@@ -1,4 +1,4 @@
-module example/module
+module github.com/www-tilden-me/CTFd_Loader
 
 go 1.26.4
 
