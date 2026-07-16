@@ -1,29 +1,30 @@
 package main
 
 import (
-    "net/http"
-    "encoding/json"
-    "fmt"
-    "io"
-    "bytes"
-    "golang.org/x/sync/errgroup"
-    "net/url"
-    "path"
-    "strconv"
-    "os"
-    "path/filepath"
-    "strings"
-    "github.com/vbauerster/mpb/v8"
+	"bytes"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
-    "flag"
+	"golang.org/x/sync/errgroup"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 )
 
 type Command string
+
 const (
-    CommandPull Command = "pull"
-    CommandScore Command = "score"
-    CommandStore Command = "store"
+	CommandPull  Command = "pull"
+	CommandScore Command = "score"
+	CommandStore Command = "store"
 )
 
 type CLIOptions struct {
@@ -41,27 +42,27 @@ type CLIOptions struct {
 }
 
 const (
-    MetadataFilename = "META.json"
-    ScoresFilename = "SCORE.json"
-    DefaultGroupLimit = 5
-    DefaultFolderPerms = 0o755
-    DefaultFilePerms = 0o644
+	MetadataFilename   = "META.json"
+	ScoresFilename     = "SCORE.json"
+	DefaultGroupLimit  = 5
+	DefaultFolderPerms = 0o755
+	DefaultFilePerms   = 0o644
 )
 
 type CTFdEvent struct {
-    BaseURL string
-    Headers map[string]string
-    SuccessfullyDownloadedChallenges map[int]ChallengeInfo
-    Location string
-    Progress *mpb.Progress
-    GroupLimit int
+	BaseURL                          string
+	Headers                          map[string]string
+	SuccessfullyDownloadedChallenges map[int]ChallengeInfo
+	Location                         string
+	Progress                         *mpb.Progress
+	GroupLimit                       int
 }
 
 type CTFdEventMetadata struct {
-    BaseURL string `json:"base_url"`
-    Headers map[string]string `json:"headers"`
-    SuccessfullyDownloadedChallenges []ChallengeInfo `json:"known_challenges"`
-    Location string `json:"location"`
+	BaseURL                          string            `json:"base_url"`
+	Headers                          map[string]string `json:"headers"`
+	SuccessfullyDownloadedChallenges []ChallengeInfo   `json:"known_challenges"`
+	Location                         string            `json:"location"`
 }
 
 func JoinUrl(baseUrl string, parts ...string) (string, error) {
@@ -83,34 +84,34 @@ func ResolveURL(baseUrl string, reference string) (string, error) {
 }
 
 func Get(url string, headers map[string]string) ([]byte, error) {
-    req, err := http.NewRequest(http.MethodGet, url, nil)
-    if err != nil {
-        return nil, err
-    }
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
 
-    for key, value := range headers {
-        req.Header.Set(key, value)
-    }
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-    body, err := io.ReadAll(resp.Body)
-    if err != nil {
-        return nil, err
-    }
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 
-    return body, nil
+	return body, nil
 }
 
 type Hint struct {
-    Id int `json:"id"`
-    Cost int `json:"cost"`
-    Title string `json:"title"`
-    Content string `json:"content"`
+	Id      int    `json:"id"`
+	Cost    int    `json:"cost"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
 }
 
 type DownloadedFile struct {
@@ -119,20 +120,20 @@ type DownloadedFile struct {
 }
 
 type Challenge struct {
-    Id int `json:"id"`
-    Name string `json:"name"`
-    Value int `json:"value"`
-    Category string `json:"category"`
-    SolvedByMe bool `json:"solved_by_me"`
-    Attempts int `json:"attempts"`
-    Ratings any `json:"ratings"`
+	Id         int    `json:"id"`
+	Name       string `json:"name"`
+	Value      int    `json:"value"`
+	Category   string `json:"category"`
+	SolvedByMe bool   `json:"solved_by_me"`
+	Attempts   int    `json:"attempts"`
+	Ratings    any    `json:"ratings"`
 
-    Description string `json:"description"`
-    Type string `json:"type"`
-    Files []*DownloadedFile `json:"-"`
-    FilePaths []string `json:"files"`
-    Hints []Hint `json:"hints"`
-    MaxAttempts int `json:"max_attempts"`
+	Description string            `json:"description"`
+	Type        string            `json:"type"`
+	Files       []*DownloadedFile `json:"-"`
+	FilePaths   []string          `json:"files"`
+	Hints       []Hint            `json:"hints"`
+	MaxAttempts int               `json:"max_attempts"`
 }
 
 type ChallengeMetadata struct {
@@ -147,40 +148,40 @@ type ChallengeMetadata struct {
 }
 
 type APIResponse struct {
-    Success bool `json:"success"`
-    Data any `json:"data"`
+	Success bool `json:"success"`
+	Data    any  `json:"data"`
 }
 
 type ChallengeInfo struct {
-    Id int `json:"id"`
-    Name string `json:"name"`   
+	Id   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 type Challenges []ChallengeInfo
 type FinalScore struct {
-	Score int `json:"score"`
-	Total int `json:"total"`
-    Solved int `json:"solved"`
-    Unsolved int `json:"unsolved"`
-    Failed int `json:"failed"`
-    Challenges int `json:"challenge_count"`
+	Score      int `json:"score"`
+	Total      int `json:"total"`
+	Solved     int `json:"solved"`
+	Unsolved   int `json:"unsolved"`
+	Failed     int `json:"failed"`
+	Challenges int `json:"challenge_count"`
 }
 
 type ChallengeScores struct {
-    Scores []ChallengeScore `json:"scores"`
-    FinalResult FinalScore `json:"results"`
+	Scores      []ChallengeScore `json:"scores"`
+	FinalResult FinalScore       `json:"results"`
 }
 
 func (ctfd *CTFdEvent) GetChallenges() (*Challenges, error) {
-    endpoint, err := JoinUrl(ctfd.BaseURL, "/api/v1/challenges")
-    if err != nil {
-        return nil, err
-    }
+	endpoint, err := JoinUrl(ctfd.BaseURL, "/api/v1/challenges")
+	if err != nil {
+		return nil, err
+	}
 
 	resp, err := Get(endpoint, ctfd.Headers)
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
 	var result APIResponse
 	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&result); err != nil {
@@ -226,74 +227,74 @@ func (ctfd *CTFdEvent) GetChallenges() (*Challenges, error) {
 	return &challenges, nil
 }
 
-func (ctfd *CTFdEvent) GetChallenge(id int) (*Challenge, error){
-    endpoint, err := JoinUrl(ctfd.BaseURL, "/api/v1/challenges", strconv.Itoa(id))
-    if err != nil {
-        return nil, err
-    }
-    
+func (ctfd *CTFdEvent) GetChallenge(id int) (*Challenge, error) {
+	endpoint, err := JoinUrl(ctfd.BaseURL, "/api/v1/challenges", strconv.Itoa(id))
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := Get(endpoint, ctfd.Headers)
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    var result APIResponse
-    if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&result); err != nil {
-        return nil, err
-    }
+	var result APIResponse
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&result); err != nil {
+		return nil, err
+	}
 
-    if !result.Success {
-        return nil, fmt.Errorf("API Call success false")
-    }
+	if !result.Success {
+		return nil, fmt.Errorf("API Call success false")
+	}
 
-    data, ok := result.Data.(map[string]any)
-    if !ok {
-        return nil, fmt.Errorf("API Returned Weird Data")
-    }
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("API Returned Weird Data")
+	}
 
-    raw, err := json.Marshal(data)
-    if err != nil {
-        return nil, err
-    }
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
 
-    challenge := Challenge{}
-    if err := json.Unmarshal(raw, &challenge); err != nil {
-        return nil, err
-    }
+	challenge := Challenge{}
+	if err := json.Unmarshal(raw, &challenge); err != nil {
+		return nil, err
+	}
 
-    return &challenge, nil
+	return &challenge, nil
 }
 
 func (ctfd *CTFdEvent) DownloadFiles(filePaths []string) ([]*DownloadedFile, error) {
-    files := []*DownloadedFile{}
+	files := []*DownloadedFile{}
 
-    for _, filePath := range filePaths {
-        endpoint, err := ResolveURL(ctfd.BaseURL, filePath)
-        if err != nil {
-            return nil, err
-        }
-        
-        resp, err := Get(endpoint, ctfd.Headers)
-        if err != nil {
-            return nil, err
-        }
+	for _, filePath := range filePaths {
+		endpoint, err := ResolveURL(ctfd.BaseURL, filePath)
+		if err != nil {
+			return nil, err
+		}
 
-        parsed, err := url.Parse(filePath)
-        if err != nil {
-            panic(err)
-        }
+		resp, err := Get(endpoint, ctfd.Headers)
+		if err != nil {
+			return nil, err
+		}
 
-        filename := path.Base(parsed.Path)
+		parsed, err := url.Parse(filePath)
+		if err != nil {
+			panic(err)
+		}
 
-        file := DownloadedFile{
-            Name: filename,
-            Data: resp,
-        }
+		filename := path.Base(parsed.Path)
 
-        files = append(files, &file)
-    }
+		file := DownloadedFile{
+			Name: filename,
+			Data: resp,
+		}
 
-    return files, nil
+		files = append(files, &file)
+	}
+
+	return files, nil
 }
 
 func SanitizeFilename(value string) string {
@@ -309,9 +310,9 @@ func SanitizeFilename(value string) string {
 		"<", "",
 		">", "",
 		"|", "",
-        "'", "",
-        "\"", "",
-        " ", "_",
+		"'", "",
+		"\"", "",
+		" ", "_",
 	)
 
 	value = replacer.Replace(value)
@@ -379,56 +380,56 @@ func (challenge *Challenge) WriteChallenge(location string) error {
 	return nil
 }
 
-func (ctfd *CTFdEvent) SaveChallenge(chal ChallengeInfo) error{
-    challenge, err := ctfd.GetChallenge(chal.Id)
-    if err != nil {
-        return fmt.Errorf("%d: %w", chal.Id, err)
-    }
+func (ctfd *CTFdEvent) SaveChallenge(chal ChallengeInfo) error {
+	challenge, err := ctfd.GetChallenge(chal.Id)
+	if err != nil {
+		return fmt.Errorf("%d: %w", chal.Id, err)
+	}
 
-    if len(challenge.FilePaths) > 0 {
-        files, err := ctfd.DownloadFiles(challenge.FilePaths)
-        if err != nil {
-            return fmt.Errorf("%d: %w", chal.Id, err)
-        }
-        challenge.Files = files
-    }
+	if len(challenge.FilePaths) > 0 {
+		files, err := ctfd.DownloadFiles(challenge.FilePaths)
+		if err != nil {
+			return fmt.Errorf("%d: %w", chal.Id, err)
+		}
+		challenge.Files = files
+	}
 
-    err = challenge.WriteChallenge(ctfd.Location)
-    if err != nil {
-        return fmt.Errorf("%d: %w", chal.Id, err)
-    }
-    return nil
+	err = challenge.WriteChallenge(ctfd.Location)
+	if err != nil {
+		return fmt.Errorf("%d: %w", chal.Id, err)
+	}
+	return nil
 }
 
 type ChallengeScore struct {
-    Id int `json:"id"`
-    Name string `json:"name"`
-    Value int `json:"value"`
-    Category string `json:"category"`
-    SolvedByMe bool `json:"solved_by_me"`
-    Attempts int `json:"attempts"`
-    Ratings any `json:"ratings"`
-    MaxAttempts int `json:"max_attempts"`
+	Id          int    `json:"id"`
+	Name        string `json:"name"`
+	Value       int    `json:"value"`
+	Category    string `json:"category"`
+	SolvedByMe  bool   `json:"solved_by_me"`
+	Attempts    int    `json:"attempts"`
+	Ratings     any    `json:"ratings"`
+	MaxAttempts int    `json:"max_attempts"`
 }
 
-func (ctfd *CTFdEvent) ScoreChallenge(chal ChallengeInfo) (*ChallengeScore, error){
-    challenge, err := ctfd.GetChallenge(chal.Id)
-    if err != nil {
-        return nil, fmt.Errorf("%d: %v", chal.Id, err)
-    }
+func (ctfd *CTFdEvent) ScoreChallenge(chal ChallengeInfo) (*ChallengeScore, error) {
+	challenge, err := ctfd.GetChallenge(chal.Id)
+	if err != nil {
+		return nil, fmt.Errorf("%d: %v", chal.Id, err)
+	}
 
-    score := ChallengeScore{
-        Id: challenge.Id,
-        Name: challenge.Name,
-        Value: challenge.Value,
-        Category: challenge.Category,
-        SolvedByMe: challenge.SolvedByMe,
-        Attempts: challenge.Attempts,
-        Ratings: challenge.Ratings,
-        MaxAttempts: challenge.MaxAttempts,
-    }
+	score := ChallengeScore{
+		Id:          challenge.Id,
+		Name:        challenge.Name,
+		Value:       challenge.Value,
+		Category:    challenge.Category,
+		SolvedByMe:  challenge.SolvedByMe,
+		Attempts:    challenge.Attempts,
+		Ratings:     challenge.Ratings,
+		MaxAttempts: challenge.MaxAttempts,
+	}
 
-    return &score, nil
+	return &score, nil
 }
 
 func (ctfd *CTFdEvent) AlreadySaved(challenge ChallengeInfo) bool {
@@ -440,16 +441,16 @@ func (ctfd *CTFdEvent) AlreadySaved(challenge ChallengeInfo) bool {
 		return true
 	}
 
-    return false
+	return false
 }
 
 func (ctfd *CTFdEvent) PullEvent() {
-    challengeList, err := ctfd.GetChallenges()
-    if err != nil {
-        panic(err)
-    }
+	challengeList, err := ctfd.GetChallenges()
+	if err != nil {
+		panic(err)
+	}
 
-    bar := ctfd.Progress.AddBar(
+	bar := ctfd.Progress.AddBar(
 		int64(len(*challengeList)),
 		mpb.PrependDecorators(
 			decor.Name("Loading "),
@@ -457,44 +458,47 @@ func (ctfd *CTFdEvent) PullEvent() {
 		),
 		mpb.AppendDecorators(
 			decor.Percentage(),
-            decor.Elapsed(decor.ET_STYLE_GO),
+			decor.Elapsed(decor.ET_STYLE_GO),
 		),
 	)
 
-	mutex := sync.Mutex
-    fails := []ChallengeInfo{}
-    var group errgroup.Group
+	mutex := sync.Mutex{}
+	fails := []ChallengeInfo{}
+	var group errgroup.Group
 
-    group.SetLimit(ctfd.GroupLimit)
+	group.SetLimit(ctfd.GroupLimit)
 
-    for _, chal := range *challengeList {
-        if ctfd.AlreadySaved(chal){
+	for _, chal := range *challengeList {
+		if ctfd.AlreadySaved(chal) {
 			bar.Increment()
-            continue
-        }
+			continue
+		}
 
-        group.Go(func() error {
-            defer bar.Increment()
-            err := ctfd.SaveChallenge(chal)
-            if err != nil {
+		group.Go(func() error {
+			defer bar.Increment()
+			err := ctfd.SaveChallenge(chal)
+			if err != nil {
 				mutex.Lock()
-                fails = append(fails, chal)
+				fails = append(fails, chal)
 				mutex.Unlock()
-            }
+			} else {
+				mutex.Lock()
+				ctfd.SuccessfullyDownloadedChallenges[chal.Id] = chal
+				mutex.Unlock()
+			}
 
-			mutex.Lock()
-			ctfd.SuccessfullyDownloadedChallenges[chal.Id] = chal
-			mutex.Unlock()
-            return nil
-        })
-    }
+			return nil
+		})
+	}
 
-    group.Wait()
+	group.Wait()
 
-    fmt.Println("\nFailed:")
-    for _, chal := range fails{
-        fmt.Printf("\"%s\" -- id: %d\n", chal.Name, chal.Id)
-    }
+	if len(fails) > 0 {
+		fmt.Println("\nFailed:")
+		for _, chal := range fails {
+			fmt.Printf("\"%s\" -- id: %d\n", chal.Name, chal.Id)
+		}
+	}
 }
 
 func (scores ChallengeScores) WriteScores(location string) error {
@@ -519,12 +523,12 @@ func (scores ChallengeScores) WriteScores(location string) error {
 }
 
 func (ctfd *CTFdEvent) ScoreEvent() {
-    challengeList, err := ctfd.GetChallenges()
-    if err != nil {
-        panic(err)
-    }
+	challengeList, err := ctfd.GetChallenges()
+	if err != nil {
+		panic(err)
+	}
 
-    bar := ctfd.Progress.AddBar(
+	bar := ctfd.Progress.AddBar(
 		int64(len(*challengeList)),
 		mpb.PrependDecorators(
 			decor.Name("Scoring "),
@@ -532,65 +536,65 @@ func (ctfd *CTFdEvent) ScoreEvent() {
 		),
 		mpb.AppendDecorators(
 			decor.Percentage(),
-            decor.Elapsed(decor.ET_STYLE_GO),
+			decor.Elapsed(decor.ET_STYLE_GO),
 		),
 	)
 
-    var group errgroup.Group
+	var group errgroup.Group
 
-    group.SetLimit(ctfd.GroupLimit)
+	group.SetLimit(ctfd.GroupLimit)
 
-	mutex := sync.Mutex
-    scores := ChallengeScores{}
-    scores.FinalResult = FinalScore{}
+	mutex := sync.Mutex{}
+	scores := ChallengeScores{}
+	scores.FinalResult = FinalScore{}
 
-    for _, chal := range *challengeList {
-        group.Go(func() error {
-            defer bar.Increment()
-            score, err := ctfd.ScoreChallenge(chal)
-            if err != nil {
-                return fmt.Errorf("Could not score \"%s\"", chal.Name)
-            }
+	for _, chal := range *challengeList {
+		group.Go(func() error {
+			defer bar.Increment()
+			score, err := ctfd.ScoreChallenge(chal)
+			if err != nil {
+				return fmt.Errorf("Could not score \"%s\"", chal.Name)
+			}
 
 			mutex.Lock()
-            scores.FinalResult.Challenges += 1
-            scores.Scores = append(scores.Scores, *score)
-            scores.FinalResult.Total += score.Value
-            if score.SolvedByMe {
-                scores.FinalResult.Solved += 1
-                scores.FinalResult.Score +=  score.Value
-            } else if score.MaxAttempts == score.Attempts {
-                scores.FinalResult.Failed += 1
-            } else {
-                scores.FinalResult.Unsolved += 1
-            }
+			scores.FinalResult.Challenges += 1
+			scores.Scores = append(scores.Scores, *score)
+			scores.FinalResult.Total += score.Value
+			if score.SolvedByMe {
+				scores.FinalResult.Solved += 1
+				scores.FinalResult.Score += score.Value
+			} else if score.MaxAttempts > 0 && score.Attempts >= score.MaxAttempts {
+				scores.FinalResult.Failed += 1
+			} else {
+				scores.FinalResult.Unsolved += 1
+			}
 			mutex.Unlock()
-            return nil
-        })
-    }
+			return nil
+		})
+	}
 
-    if err := group.Wait(); err != nil {
-        panic(err)
-    }
+	if err := group.Wait(); err != nil {
+		panic(err)
+	}
 
-    if err = scores.WriteScores(ctfd.Location); err != nil {
-        panic(err)
-    }
+	if err = scores.WriteScores(ctfd.Location); err != nil {
+		panic(err)
+	}
 
-    fmt.Printf("\nSolved: %d / %d\nUnsolved: %d / %d\nFailed: %d / %d\nScore: %d / %d\n", 
-                scores.FinalResult.Solved,
-                scores.FinalResult.Challenges,
-                scores.FinalResult.Unsolved,
-                scores.FinalResult.Challenges,
-                scores.FinalResult.Failed,
-                scores.FinalResult.Challenges,
-                scores.FinalResult.Score,
-                scores.FinalResult.Total)
+	fmt.Printf("\nSolved: %d / %d\nUnsolved: %d / %d\nFailed: %d / %d\nScore: %d / %d\n",
+		scores.FinalResult.Solved,
+		scores.FinalResult.Challenges,
+		scores.FinalResult.Unsolved,
+		scores.FinalResult.Challenges,
+		scores.FinalResult.Failed,
+		scores.FinalResult.Challenges,
+		scores.FinalResult.Score,
+		scores.FinalResult.Total)
 }
 
-func (ctfd *CTFdEvent) GetSuccessfullyDownloadedChallengeList() []ChallengeInfo{
-	result := []ChallengeInfo
-	for _, value := range ctfd.SuccessfullyDownloadedChallenges{
+func (ctfd *CTFdEvent) GetSuccessfullyDownloadedChallengeList() []ChallengeInfo {
+	result := []ChallengeInfo{}
+	for _, value := range ctfd.SuccessfullyDownloadedChallenges {
 		result = append(result, value)
 	}
 	return result
@@ -601,12 +605,12 @@ func (ctfd *CTFdEvent) WriteMetadata() error {
 		return fmt.Errorf("create event directory %q: %w", ctfd.Location, err)
 	}
 
-    metadata := CTFdEventMetadata{
-        BaseURL: ctfd.BaseURL,
-        Headers: ctfd.Headers,
-        SuccessfullyDownloadedChallenges: ctfd.GetSuccessfullyDownloadedChallengeList(),
-        Location: ctfd.Location,
-    }
+	metadata := CTFdEventMetadata{
+		BaseURL:                          ctfd.BaseURL,
+		Headers:                          ctfd.Headers,
+		SuccessfullyDownloadedChallenges: ctfd.GetSuccessfullyDownloadedChallengeList(),
+		Location:                         ctfd.Location,
+	}
 
 	data, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
@@ -646,14 +650,14 @@ func ReadEventMetadata(location string) (*CTFdEvent, error) {
 		return nil, fmt.Errorf("decode event metadata %q: %w", metadataPath, err)
 	}
 
-    event := CTFdEvent{
-        BaseURL: metadata.BaseURL,
-        Headers: metadata.Headers,
-        SuccessfullyDownloadedChallenges: make(map[int]ChallengeInfo),
-        Location: metadata.Location,
-    }
+	event := CTFdEvent{
+		BaseURL:                          metadata.BaseURL,
+		Headers:                          metadata.Headers,
+		SuccessfullyDownloadedChallenges: make(map[int]ChallengeInfo),
+		Location:                         metadata.Location,
+	}
 
-	for _, chal := range metadata.SuccessfullyDownloadedChallenges{
+	for _, chal := range metadata.SuccessfullyDownloadedChallenges {
 		event.SuccessfullyDownloadedChallenges[chal.Id] = chal
 	}
 
@@ -749,30 +753,30 @@ func ParseCLI() (*CLIOptions, error) {
 	}, nil
 }
 
-func main(){
-    options, err := ParseCLI()
+func main() {
+	options, err := ParseCLI()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(2)
 	}
 
-
-    // First try loading the existing event from the positional directory.
+	// First try loading the existing event from the positional directory.
 	event, err := ReadEventMetadata(options.Location)
 	if err != nil {
 		// No usable metadata, so start with defaults.
 		event = &CTFdEvent{
-			BaseURL:   "",
-			Headers:   make(map[string]string),
-			Location:  options.Location,
-			GroupLimit: DefaultGroupLimit,
+			BaseURL:                          "",
+			Headers:                          make(map[string]string),
+			Location:                         options.Location,
+			GroupLimit:                       DefaultGroupLimit,
+			SuccessfullyDownloadedChallenges: make(map[int]ChallengeInfo),
 		}
 	}
 
-    // The positional location always wins.
+	// The positional location always wins.
 	event.Location = options.Location
 
-    if options.BaseURLSet {
+	if options.BaseURLSet {
 		event.BaseURL = options.BaseURL
 	}
 
@@ -784,19 +788,20 @@ func main(){
 		event.Headers["Cookie"] = options.Cookie
 	}
 
-    event.GroupLimit = options.GroupLimit
+	event.GroupLimit = options.GroupLimit
 	if event.GroupLimit < 1 {
 		event.GroupLimit = DefaultGroupLimit
 	}
 
-    if event.BaseURL == "" {
-        fmt.Fprintln(os.Stderr, "No Base URL")
+	if event.BaseURL == "" {
+		fmt.Fprintln(os.Stderr, "No Base URL")
 		os.Exit(1)
-    }
+	}
 
-    event.Progress = mpb.New()
+	event.Progress = mpb.New()
+	defer event.Progress.Wait()
 
-    switch options.Command {
+	switch options.Command {
 	case CommandPull:
 		event.PullEvent()
 
@@ -807,8 +812,8 @@ func main(){
 
 	case CommandScore:
 		event.ScoreEvent()
-    case CommandStore:
-        if err := event.WriteMetadata(); err != nil {
+	case CommandStore:
+		if err := event.WriteMetadata(); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
