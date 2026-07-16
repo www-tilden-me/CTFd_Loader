@@ -16,6 +16,7 @@ import (
     "github.com/vbauerster/mpb/v8"
 	"github.com/vbauerster/mpb/v8/decor"
     "flag"
+	"sync"
 )
 
 type Command string
@@ -50,7 +51,7 @@ const (
 type CTFdEvent struct {
     BaseURL string
     Headers map[string]string
-    SuccessfullyDownloadedChallenges []ChallengeInfo
+    SuccessfullyDownloadedChallenges map[int]ChallengeInfo
     Location string
     Progress *mpb.Progress
     GroupLimit int
@@ -381,23 +382,21 @@ func (challenge *Challenge) WriteChallenge(location string) error {
 func (ctfd *CTFdEvent) SaveChallenge(chal ChallengeInfo) error{
     challenge, err := ctfd.GetChallenge(chal.Id)
     if err != nil {
-        return fmt.Errorf("%d: %v", chal.Id, err)
+        return fmt.Errorf("%d: %w", chal.Id, err)
     }
 
     if len(challenge.FilePaths) > 0 {
         files, err := ctfd.DownloadFiles(challenge.FilePaths)
         if err != nil {
-            return fmt.Errorf("%d: %v", chal.Id, err)
+            return fmt.Errorf("%d: %w", chal.Id, err)
         }
         challenge.Files = files
     }
 
     err = challenge.WriteChallenge(ctfd.Location)
     if err != nil {
-        return fmt.Errorf("%d: %v", chal.Id, err)
+        return fmt.Errorf("%d: %w", chal.Id, err)
     }
-    
-    ctfd.SuccessfullyDownloadedChallenges = append(ctfd.SuccessfullyDownloadedChallenges, chal)
     return nil
 }
 
@@ -433,11 +432,13 @@ func (ctfd *CTFdEvent) ScoreChallenge(chal ChallengeInfo) (*ChallengeScore, erro
 }
 
 func (ctfd *CTFdEvent) AlreadySaved(challenge ChallengeInfo) bool {
-    for _, chal := range ctfd.SuccessfullyDownloadedChallenges { //TODO: Do this better with a dictionary maybe?
-        if chal.Id == challenge.Id && chal.Name == challenge.Name {
-            return true
-        }
-    }
+	chal, ok := ctfd.SuccessfullyDownloadedChallenges[challenge.Id]
+	if !ok {
+		return false
+	}
+	if chal.Name == challenge.Name {
+		return true
+	}
 
     return false
 }
@@ -460,6 +461,7 @@ func (ctfd *CTFdEvent) PullEvent() {
 		),
 	)
 
+	mutex := sync.Mutex
     fails := []ChallengeInfo{}
     var group errgroup.Group
 
@@ -475,15 +477,19 @@ func (ctfd *CTFdEvent) PullEvent() {
             defer bar.Increment()
             err := ctfd.SaveChallenge(chal)
             if err != nil {
+				mutex.Lock()
                 fails = append(fails, chal)
+				mutex.Unlock()
             }
+
+			mutex.Lock()
+			ctfd.SuccessfullyDownloadedChallenges[chal.Id] = chal
+			mutex.Unlock()
             return nil
         })
     }
 
-    if err := group.Wait(); err != nil {
-        panic(err)
-    }
+    group.Wait()
 
     fmt.Println("\nFailed:")
     for _, chal := range fails{
@@ -534,6 +540,7 @@ func (ctfd *CTFdEvent) ScoreEvent() {
 
     group.SetLimit(ctfd.GroupLimit)
 
+	mutex := sync.Mutex
     scores := ChallengeScores{}
     scores.FinalResult = FinalScore{}
 
@@ -542,9 +549,10 @@ func (ctfd *CTFdEvent) ScoreEvent() {
             defer bar.Increment()
             score, err := ctfd.ScoreChallenge(chal)
             if err != nil {
-                panic(fmt.Sprintf("Could not score \"%s\"", chal.Name))
+                return fmt.Errorf("Could not score \"%s\"", chal.Name)
             }
 
+			mutex.Lock()
             scores.FinalResult.Challenges += 1
             scores.Scores = append(scores.Scores, *score)
             scores.FinalResult.Total += score.Value
@@ -556,6 +564,7 @@ func (ctfd *CTFdEvent) ScoreEvent() {
             } else {
                 scores.FinalResult.Unsolved += 1
             }
+			mutex.Unlock()
             return nil
         })
     }
@@ -579,6 +588,14 @@ func (ctfd *CTFdEvent) ScoreEvent() {
                 scores.FinalResult.Total)
 }
 
+func (ctfd *CTFdEvent) GetSuccessfullyDownloadedChallengeList() []ChallengeInfo{
+	result := []ChallengeInfo
+	for _, value := range ctfd.SuccessfullyDownloadedChallenges{
+		result = append(result, value)
+	}
+	return result
+}
+
 func (ctfd *CTFdEvent) WriteMetadata() error {
 	if err := os.MkdirAll(ctfd.Location, DefaultFolderPerms); err != nil {
 		return fmt.Errorf("create event directory %q: %w", ctfd.Location, err)
@@ -587,7 +604,7 @@ func (ctfd *CTFdEvent) WriteMetadata() error {
     metadata := CTFdEventMetadata{
         BaseURL: ctfd.BaseURL,
         Headers: ctfd.Headers,
-        SuccessfullyDownloadedChallenges: ctfd.SuccessfullyDownloadedChallenges,
+        SuccessfullyDownloadedChallenges: ctfd.GetSuccessfullyDownloadedChallengeList(),
         Location: ctfd.Location,
     }
 
@@ -632,9 +649,13 @@ func ReadEventMetadata(location string) (*CTFdEvent, error) {
     event := CTFdEvent{
         BaseURL: metadata.BaseURL,
         Headers: metadata.Headers,
-        SuccessfullyDownloadedChallenges: metadata.SuccessfullyDownloadedChallenges,
+        SuccessfullyDownloadedChallenges: make(map[int]ChallengeInfo),
         Location: metadata.Location,
     }
+
+	for _, chal := range metadata.SuccessfullyDownloadedChallenges{
+		event.SuccessfullyDownloadedChallenges[chal.Id] = chal
+	}
 
 	return &event, nil
 }
@@ -654,7 +675,7 @@ func ParseCLI() (*CLIOptions, error) {
 	case CommandPull, CommandScore, CommandStore:
 	default:
 		return nil, fmt.Errorf(
-			"invalid command %q: expected score or pull",
+			"invalid command %q: expected score, pull, or store",
 			command,
 		)
 	}
