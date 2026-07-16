@@ -1,78 +1,101 @@
 # CTFd Challenge Downloader
 
-A small Python utility for downloading challenge metadata and files from a CTFd event, or generating a score summary.
+A small Go utility for downloading challenge metadata and files from a CTFd event or generating a score report.
 
-## Install
+## Build
 
 ```bash
-python3 -m pip install -r requirements.txt
+go mod tidy
+go build -o ctfd .
 ```
 
+Install system-wide:
+
 ```bash
-sudo cp ctfd.py /usr/local/bin/ctfd
+sudo install -m 755 ctfd /usr/local/bin/ctfd
 ```
 
 ## Usage
 
-Download all visible challenges:
+```text
+ctfd <pull|score> <location> [options]
+```
+
+Download visible challenges:
 
 ```bash
-python3 ctfd.py pull <site_url> <location>
+ctfd pull ./challenges
 ```
 
 Generate a score report:
 
 ```bash
-python3 ctfd.py score <site_url> <location>
+ctfd score ./challenges
 ```
 
-With authentication:
+Options:
+
+```text
+--base <url>          CTFd base URL
+--cookie <cookie>     CTFd session cookie
+--group_limit <n>     Maximum concurrent requests
+```
+
+Example:
 
 ```bash
-python3 ctfd.py pull <site_url> <location> \
-    --session "<session_cookie>" \
-    --auth "<api_token>"
+ctfd pull ./challenges \
+    --base "https://example.ctfd.io" \
+    --cookie "session=your-cookie" \
+    --group_limit 5
 ```
 
-```bash
-python3 ctfd.py score <site_url> <location> \
-    --session "<session_cookie>" \
-    --auth "<api_token>"
-```
-
-You can also store the API token in a `.env` file:
-
-```env
-CTFD_TOKEN=your_api_token
-```
+The tool loads settings from `<location>/META.json` when present. Explicit command-line options override saved values.
 
 ## Output
 
-Downloaded challenges are organized by category and challenge name:
-
 ```text
 challenges/
+├── META.json
+├── SCORE.json
 ├── Crypto/
-│   └── Example Challenge/
+│   └── Example_Challenge/
 │       ├── META.json
 │       └── challenge.txt
 └── Pwn/
-    └── Buffer Overflow/
+    └── Buffer_Overflow/
         ├── META.json
         └── binary
 ```
 
-The `score` command writes results to:
-
-```text
-RESULTS.json
-```
-
 Only challenges and files visible to the authenticated account are downloaded.
 
-## TODO:
-- Add Async Loading for challenges and files
-- Replace the "Saved:" and "Scored:" Messages with a progress bar (maybe only on -p)
-- Normalize session and make easier to call
-- Add checkpointing (load to make the checkpoint of whats loaded and pull to pull)
-    - Pull and score should save the base_url, session? maybe?
+## Development
+
+Run without building:
+
+```bash
+go run . pull ./challenges
+```
+
+Format and check:
+
+```bash
+gofmt -w .
+go vet ./...
+```
+
+TODO:
+* Make the lookup for already saved faster by using a dict or something
+* `fails = append(fails, chal)` is a concurrent slice write and causes a data race.
+* `SuccessfullyDownloadedChallenges = append(...)` is a concurrent slice write and causes a data race.
+* `scores.Scores` and `scores.FinalResult` are modified concurrently and cause data races.
+* Already-downloaded challenges are skipped without incrementing the progress bar, so `pull` may never reach 100%.
+* `PullEvent` panics on the first worker error, so the collected failure list never prints.
+* `ScoreEvent` panics inside a goroutine instead of returning the error through `errgroup`.
+* `Get` does not reject non-2xx HTTP responses, so login/error pages may later appear as JSON parsing errors.
+* Any metadata read error is treated as missing metadata, including malformed JSON and permission errors.
+* The invalid-command error says only `score or pull` even though `store` is valid.
+* `DownloadFiles` panics on a malformed file URL instead of returning an error.
+* Wrapped errors use `%v` in several places; use `%w` so callers can inspect the underlying error.
+* The loop variables should be copied before goroutines for compatibility and clarity: `chal := chal` and `i := i`.
