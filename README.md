@@ -85,7 +85,7 @@ gofmt -w .
 go vet ./...
 ```
 
-TODO:
+## TODO:
 * Make the lookup for already saved faster by using a dict or something
 * `fails = append(fails, chal)` is a concurrent slice write and causes a data race.
 * `SuccessfullyDownloadedChallenges = append(...)` is a concurrent slice write and causes a data race.
