@@ -18,7 +18,7 @@ sudo install -m 755 ctfd /usr/local/bin/ctfd
 ## Usage
 
 ```text
-ctfd <pull|score> <location> [options]
+ctfd <pull|score|store> <location> [options]
 ```
 
 Download visible challenges:
